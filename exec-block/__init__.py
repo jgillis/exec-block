@@ -5,7 +5,6 @@ from sphinx.writers.latex import LaTeXTranslator
 from sphinx.util.nodes import set_source_info
 
 from docutils import nodes
-import ipdb
 import hashlib
 from collections import defaultdict
 
