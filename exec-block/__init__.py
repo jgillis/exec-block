@@ -39,6 +39,7 @@ class ExecBlockDirective(Directive):
         'caption': directives.unchanged_required,
         'class': directives.class_option,
         'name': directives.unchanged,
+        'hide-output': bool
     }
     input_hidden = False
 
@@ -47,8 +48,18 @@ class ExecBlockDirective(Directive):
         document = self.state.document
         lang = self.arguments[0]
 
+
+        visible_code_lines = [i for i in self.content if " [hidden]" not in i]
+
+        # Remove leading empty lines
+        offset = 0
+        for i,L in enumerate(visible_code_lines):
+          if len(L.rstrip())==0:
+            offset = i+1
+          else:
+            break
         
-        visible_code = u'\n'.join([i for i in self.content if " [hidden]" not in i])
+        visible_code = u'\n'.join(visible_code_lines[offset:])
         all_code = u'\n'.join([i.replace(" [hidden]","") for i in self.content])
         
         full_code = u'\n'.join(ExecBlockAddHeaderDirective.headers[lang]+[all_code])
