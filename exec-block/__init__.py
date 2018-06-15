@@ -16,10 +16,40 @@ class ExecBlockAddHeaderDirective(Directive):
 
     def run(self):
       lang = self.arguments[0]
-      self.headers[lang].extend(self.content)
+      if self.content not in self.headers[lang]:
+        self.headers[lang].extend(self.content)
 
       return []
+      
 
+class ExecBlockAddFilterDirective(Directive):
+    has_content = True
+    required_arguments = 0
+    optional_arguments = 0
+    filters = set()
+
+    def run(self):
+      self.filters.add("\n".join(self.content))
+      return []
+
+    @classmethod
+    def filter(cl,data):
+      for f in cl.filters:
+        data = data.replace(f,"")
+      return data
+
+
+def remove_leading_empty_lines(lines):
+    if isinstance(lines,str):
+      lines = lines.split("\n")
+    offset = 0
+    for i,L in enumerate(lines):
+      if len(L.rstrip())==0:
+        offset = i+1
+      else:
+        break
+    
+    return u'\n'.join(lines[offset:])
 
 class ExecBlockDirective(Directive):
     """
@@ -51,15 +81,9 @@ class ExecBlockDirective(Directive):
 
         visible_code_lines = [i for i in self.content if " [hidden]" not in i]
 
-        # Remove leading empty lines
-        offset = 0
-        for i,L in enumerate(visible_code_lines):
-          if len(L.rstrip())==0:
-            offset = i+1
-          else:
-            break
-        
-        visible_code = u'\n'.join(visible_code_lines[offset:])
+
+        visible_code = remove_leading_empty_lines(visible_code_lines)
+
         all_code = u'\n'.join([i.replace(" [hidden]","") for i in self.content])
         
         full_code = u'\n'.join(ExecBlockAddHeaderDirective.headers[lang]+[all_code])
@@ -113,24 +137,41 @@ class ExecBlockDirective(Directive):
 
         m = hashlib.sha256()
         m.update(full_code.encode('utf-8'))
+        path = "snippets"
+        if not os.path.exists(path):
+          os.mkdir("snippets")
+
         file_prefix = m.hexdigest()
-        with open(file_prefix+"."+ lang+".in","w") as f:
+        with open(os.path.join(path,file_prefix+"."+ lang+".in"),"w") as f:
           f.write(full_code)
 
         try:
-          with open(file_prefix+"."+ lang+".out","r") as f:
+          with open(os.path.join(path,file_prefix+"."+ lang+".out"),"r") as f:
             output_text = f.read()
         except:
           output_text = "(Output not available)"
+
+
+        
+
+        output_hidden = len(output_text.rstrip())==0
+
+        output_text = ExecBlockAddFilterDirective.filter(output_text)
+
+
+        output_text = remove_leading_empty_lines(output_text)
 
         output = nodes.literal_block(output_text,output_text)
         output["language"] = "none"
         output['classes'].append("exec-block-output")
 
-        if self.input_hidden:
-          return [output]
-        else:
-          return [literal,output]
+        ret = []
+        if not self.input_hidden:
+          ret.append(literal)
+        if not output_hidden:
+          ret.append(output)
+
+        return ret
 
 class OutputExecBlockDirective(ExecBlockDirective):
     input_hidden = True
@@ -140,4 +181,4 @@ def setup(app):
     app.add_directive('exec-block',  ExecBlockDirective)
     app.add_directive('output-block',  OutputExecBlockDirective)
     app.add_directive('exec-block-add-header',  ExecBlockAddHeaderDirective)
- 
+    app.add_directive('exec-block-add-filter',  ExecBlockAddFilterDirective)
